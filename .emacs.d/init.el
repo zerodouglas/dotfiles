@@ -1,6 +1,8 @@
 ;; Keep custom-set-variables and friends out of my init.el
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 
+(setq make-backup-files nil) ; stop creating ~ files
+
 (add-to-list 'default-frame-alist '(font . "Iosevka-14.5"))
 
 (require 'package)
@@ -51,6 +53,16 @@
   :interpreter
   ("scala" . scala-mode))
 
+(use-package sbt-mode
+  :commands sbt-start sbt-command
+  :config
+  (substitute-key-definition
+   'minibuffer-complete-word
+   'self-insert-command
+   minibuffer-local-completion-map)
+   (setq sbt:program-options '("-Dsbt.supershell=false"))
+)
+
 (use-package envrc
   :config
   :hook (prog-mode . envrc-global-mode))
@@ -67,9 +79,40 @@
 
 (require 'go-mode)
 
+(use-package haskell-mode
+  :defer t
+  :commands (haskell-mode)
+  :init
+  (defun ebn/haskell-mode-setup ()
+    (interactive)
+    (setq-local eldoc-documentation-function #'haskell-doc-current-info
+        tab-stop-list '(2)
+        indent-line-function #'indent-relative
+        tab-width 2)
+    (interactive-haskell-mode)
+    (haskell-indentation-mode)
+    (electric-pair-mode))
+  (add-hook 'haskell-mode-hook #'ebn/haskell-mode-setup)
+
+  :custom
+  (haskell-process-type 'cabal-repl)
+  (haskell-process-load-or-reload-prompt nil)
+  (haskell-process-auto-import-loaded-modules t)
+  (haskell-process-log t)
+  (haskell-interactive-popup-errors nil)
+  (haskell-font-lock-symbols t)
+
+  :config
+  (defun haskell-mode-after-save-handler ()
+    (let ((inhibit-message t))
+      (eglot-format-buffer))))
+
 (use-package eglot
   :ensure t
-  :hook ((haskell-mode go-mode) . eglot-ensure)
+  :hook
+  (haskell-mode . eglot-ensure)
+  (go-mode . eglot-ensure)
+  (scala-mode . eglot-ensure)
   :custom
   (eglot-autoshutdown t)
   (eglot-autoreconnect nil)
@@ -79,7 +122,6 @@
   (eldoc-echo-area-use-multiline-p 2))
 
 (use-package corfu
-  :defer t
   :custom
   (corfu-auto-delay 0.2)
   (corfu-cycle t)
