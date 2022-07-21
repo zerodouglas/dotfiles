@@ -67,7 +67,31 @@
   :config
   :hook (prog-mode . envrc-global-mode))
 
-(repeat-mode 1)
+(cl-defmacro def-repeat-map (name &key keys exit-with)
+  (declare (indent 0))
+  (let ((def-repeat-map-result nil))
+    (when exit-with
+      (push `(define-key ,name ,(kbd exit-with) #'keyboard-quit)
+        def-repeat-map-result))
+    (dolist (key (map-pairs keys))
+      (push `(define-key ,name ,(car key) ,(cdr key))
+        def-repeat-map-result)
+      (push `(put ,(cdr key) 'repeat-map ',name)
+        def-repeat-map-result))
+    `(progn
+       (defvar ,name (make-sparse-keymap))
+       ,@def-repeat-map-result)))
+
+(use-package repeat
+  :ensure nil
+  :init (repeat-mode 1)
+  :config
+  (def-repeat-map puni-expand-repeat-map
+		  :keys ("." #'puni-expand-region))
+  (def-repeat-map forward-word-repeat-map
+		  :keys ("f" #'forward-word
+			 "b" #'backward-word)
+		  :exit-with "RET"))
 
 (setq-default
  fill-column 80
@@ -138,11 +162,13 @@
   (defvar last-file-name-handler-alist nil)
   (vertico-mode))
 
-(use-package paredit
-  :defer t
-  :diminish
-  :mode ("\\.el\\'" . emacs-lisp-mode)
-  :hook ((scheme-mode emacs-lisp-mode) . enable-paredit-mode))
+(use-package puni
+  :ensure t
+  :init
+  (puni-global-mode)
+  (electric-pair-mode)
+  :bind
+  ("C-." . puni-expand-region))
 
 (use-package nix-mode
   :defer t
@@ -156,6 +182,7 @@
     completion-category-overrides '((file (styles partial-completion)))))
 
 (use-package consult
+  :ensure t
   :config
   (setq consult-preview-key nil)
   (recentf-mode)
